@@ -7,7 +7,14 @@ import time
 from typing import Dict, Optional, List, Union
 from binance.client import Client
 from binance.exceptions import BinanceAPIException, BinanceRequestException
-from binance.websockets import BinanceSocketManager
+
+# Import optionnel du WebSocket (pas critique pour le DCA)
+try:
+    from binance import ThreadedWebsocketManager
+    WEBSOCKET_AVAILABLE = True
+except ImportError:
+    WEBSOCKET_AVAILABLE = False
+
 import config
 
 logger = logging.getLogger(__name__)
@@ -50,9 +57,19 @@ class BinanceClient:
                     config.BINANCE_API_SECRET
                 )
 
-            # Initialiser le websocket si activé
-            if config.BINANCE_CONFIG['use_websocket'] and self.client:
-                self.socket_manager = BinanceSocketManager(self.client)
+            # Initialiser le websocket si activé et disponible
+            if config.BINANCE_CONFIG['use_websocket'] and self.client and WEBSOCKET_AVAILABLE:
+                try:
+                    self.socket_manager = ThreadedWebsocketManager(
+                        api_key=config.BINANCE_API_KEY if self.mode == 'live' else None,
+                        api_secret=config.BINANCE_API_SECRET if self.mode == 'live' else None
+                    )
+                    logger.info("✅ WebSocket Manager initialisé")
+                except Exception as e:
+                    logger.warning(f"⚠️ WebSocket non disponible: {e}")
+                    self.socket_manager = None
+            elif config.BINANCE_CONFIG['use_websocket'] and not WEBSOCKET_AVAILABLE:
+                logger.info("ℹ️ WebSocket désactivé (module non disponible, pas critique pour DCA)")
 
             logger.info("✅ Client Binance initialisé avec succès")
 
