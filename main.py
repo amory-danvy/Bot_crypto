@@ -55,12 +55,12 @@ class CryptoTradingBot:
             self.client = get_binance_client()
 
             # Initialiser les notifications
-            logger.info("📱 Initialisation notifications Telegram...")
+            logger.info("📱 Initialisation notifications Discord...")
             self.notif = get_notification_manager()
 
-            # Tester Telegram si activé
-            if config.ALERTS['telegram_enabled']:
-                logger.info("🧪 Test connexion Telegram...")
+            # Tester Discord si activé
+            if config.ALERTS['discord_enabled']:
+                logger.info("🧪 Test connexion Discord...")
                 # await self.notif.test_connection()
 
             # Initialiser les stratégies

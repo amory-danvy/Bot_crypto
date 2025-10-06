@@ -1,68 +1,79 @@
 """
-Système de notifications via Telegram
+Système de notifications via Discord webhook
 """
 import asyncio
 import logging
 from typing import Optional
 from datetime import datetime
-from telegram import Bot
-from telegram.error import TelegramError
+import aiohttp
 import config
 
 logger = logging.getLogger(__name__)
 
 
 class NotificationManager:
-    """Gestionnaire de notifications Telegram"""
+    """Gestionnaire de notifications Discord"""
 
     def __init__(self):
-        self.enabled = config.ALERTS['telegram_enabled']
-        self.bot = None
-        self.chat_id = config.TELEGRAM_CHAT_ID
+        self.enabled = config.ALERTS['discord_enabled']
+        self.webhook_url = config.DISCORD_WEBHOOK_URL
 
-        # Initialiser le bot si activé
+        # Vérifier la configuration
         if self.enabled:
-            self._initialize_bot()
+            self._validate_config()
 
-    def _initialize_bot(self):
-        """Initialise le bot Telegram"""
-        try:
-            if not config.TELEGRAM_BOT_TOKEN:
-                logger.warning("⚠️ TELEGRAM_BOT_TOKEN manquant, notifications désactivées")
-                self.enabled = False
-                return
-
-            if not self.chat_id:
-                logger.warning("⚠️ TELEGRAM_CHAT_ID manquant, notifications désactivées")
-                self.enabled = False
-                return
-
-            self.bot = Bot(token=config.TELEGRAM_BOT_TOKEN)
-            logger.info("✅ Bot Telegram initialisé")
-
-        except Exception as e:
-            logger.error(f"❌ Erreur initialisation bot Telegram: {e}")
+    def _validate_config(self):
+        """Valide la configuration Discord"""
+        if not self.webhook_url or self.webhook_url == 'your_discord_webhook_url_here':
+            logger.warning("⚠️ DISCORD_WEBHOOK_URL manquant, notifications désactivées")
             self.enabled = False
+            return
 
-    def _format_message(self, level: str, message: str) -> str:
+        logger.info("✅ Discord webhook configuré")
+
+    def _format_message(self, level: str, message: str) -> dict:
         """
-        Formate un message avec emoji et timestamp
+        Formate un message pour Discord
 
         Args:
             level: Niveau du message (INFO, OPPORTUNITY, TRADE, etc.)
             message: Contenu du message
 
         Returns:
-            Message formaté
+            Payload Discord formaté
         """
         emoji = config.ALERTS['levels'].get(level, '📌')
         timestamp = datetime.now().strftime('%H:%M:%S')
 
-        return f"{emoji} [{timestamp}] {level}: {message}"
+        # Couleurs selon le niveau
+        colors = {
+            'INFO': 0x3498db,      # Bleu
+            'OPPORTUNITY': 0x9b59b6,  # Violet
+            'TRADE': 0x2ecc71,     # Vert
+            'WARNING': 0xf39c12,   # Orange
+            'ERROR': 0xe74c3c,     # Rouge
+            'PROFIT': 0x27ae60,    # Vert foncé
+            'LOSS': 0xc0392b       # Rouge foncé
+        }
+
+        color = colors.get(level, 0x95a5a6)
+
+        # Créer l'embed Discord
+        embed = {
+            "title": f"{emoji} {level}",
+            "description": message,
+            "color": color,
+            "footer": {
+                "text": f"Bot Trading • {timestamp}"
+            },
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+        return {"embeds": [embed]}
 
     async def send_message(self, level: str, message: str):
         """
-        Envoie un message Telegram
+        Envoie un message Discord
 
         Args:
             level: Niveau du message
@@ -75,26 +86,24 @@ class NotificationManager:
 
         # Si désactivé, juste logger
         if not self.enabled:
-            formatted_msg = self._format_message(level, message)
-            logger.info(f"[NO TELEGRAM] {formatted_msg}")
+            emoji = config.ALERTS['levels'].get(level, '📌')
+            logger.info(f"[NO DISCORD] {emoji} {level}: {message}")
             return
 
         try:
-            formatted_msg = self._format_message(level, message)
+            payload = self._format_message(level, message)
 
-            # Envoyer le message
-            await self.bot.send_message(
-                chat_id=self.chat_id,
-                text=formatted_msg,
-                parse_mode='HTML'
-            )
+            async with aiohttp.ClientSession() as session:
+                async with session.post(self.webhook_url, json=payload) as response:
+                    if response.status == 204:
+                        logger.debug(f"✅ Message Discord envoyé: {level}")
+                    else:
+                        logger.error(f"❌ Erreur Discord: Status {response.status}")
 
-            logger.debug(f"✅ Message Telegram envoyé: {level}")
-
-        except TelegramError as e:
-            logger.error(f"❌ Erreur envoi message Telegram: {e}")
+        except aiohttp.ClientError as e:
+            logger.error(f"❌ Erreur connexion Discord: {e}")
         except Exception as e:
-            logger.error(f"❌ Erreur inattendue envoi Telegram: {e}")
+            logger.error(f"❌ Erreur inattendue envoi Discord: {e}")
 
     async def send_info(self, message: str):
         """Envoie un message d'information"""
@@ -144,7 +153,7 @@ class NotificationManager:
         """
         if executed:
             message = (
-                f"<b>DCA EXECUTED</b>\n"
+                f"**DCA EXECUTED**\n"
                 f"Coin: {coin}\n"
                 f"Amount: {amount}€\n"
                 f"Price: ${price:,.2f}\n"
@@ -153,7 +162,7 @@ class NotificationManager:
             await self.send_trade(message)
         else:
             message = (
-                f"<b>DCA OPPORTUNITY</b>\n"
+                f"**DCA OPPORTUNITY**\n"
                 f"Coin: {coin}\n"
                 f"RSI: {rsi:.1f} (oversold)\n"
                 f"Suggested amount: {amount}€\n"
@@ -179,7 +188,7 @@ class NotificationManager:
         """
         if status == 'detected':
             message = (
-                f"<b>NEW LISTING DETECTED</b>\n"
+                f"**NEW LISTING DETECTED**\n"
                 f"Token: {token}\n"
                 f"Listing time: {listing_time}\n"
                 f"Allocated: {amount}€"
@@ -187,15 +196,15 @@ class NotificationManager:
             await self.send_opportunity(message)
 
         elif status == 'preparing':
-            message = f"<b>PREPARING SNIPE</b>\nToken: {token}\nReady to execute..."
+            message = f"**PREPARING SNIPE**\nToken: {token}\nReady to execute..."
             await self.send_info(message)
 
         elif status == 'executed':
-            message = f"<b>SNIPED!</b>\nToken: {token}\nAmount: {amount}€"
+            message = f"**SNIPED!**\nToken: {token}\nAmount: {amount}€"
             await self.send_trade(message)
 
         elif status == 'failed':
-            message = f"<b>SNIPE FAILED</b>\nToken: {token}\nReason: Order not filled"
+            message = f"**SNIPE FAILED**\nToken: {token}\nReason: Order not filled"
             await self.send_error(message)
 
     async def send_scanner_alert(
@@ -214,7 +223,7 @@ class NotificationManager:
         """
         if alert_type == 'volume':
             message = (
-                f"<b>VOLUME ANOMALY</b>\n"
+                f"**VOLUME ANOMALY**\n"
                 f"Coin: {coin}\n"
                 f"Volume: {details.get('volume_ratio', 0):.1f}x average\n"
                 f"Price: ${details.get('price', 0):,.2f}"
@@ -223,7 +232,7 @@ class NotificationManager:
 
         elif alert_type == 'rsi':
             message = (
-                f"<b>EXTREME RSI</b>\n"
+                f"**EXTREME RSI**\n"
                 f"Coin: {coin}\n"
                 f"RSI: {details.get('rsi', 0):.1f}\n"
                 f"Price: ${details.get('price', 0):,.2f}"
@@ -232,7 +241,7 @@ class NotificationManager:
 
         elif alert_type == 'arbitrage':
             message = (
-                f"<b>ARBITRAGE OPPORTUNITY</b>\n"
+                f"**ARBITRAGE OPPORTUNITY**\n"
                 f"Coin: {coin}\n"
                 f"Price difference: {details.get('diff_pct', 0):.2f}%\n"
                 f"Exchange A: ${details.get('price_a', 0):,.2f}\n"
@@ -251,18 +260,18 @@ class NotificationManager:
         pnl_emoji = '💰' if pnl >= 0 else '📉'
 
         message = (
-            f"<b>📊 DAILY REPORT</b>\n"
+            f"**📊 DAILY REPORT**\n"
             f"{'='*30}\n"
             f"Capital: {stats.get('capital', 0):.2f}€\n"
             f"P&L: {pnl_emoji} {pnl:+.2f}€ ({stats.get('pnl_pct', 0):+.1f}%)\n"
             f"Trades today: {stats.get('trades_count', 0)}\n"
             f"Win rate: {stats.get('win_rate', 0):.1f}%\n"
             f"\n"
-            f"<b>Strategies:</b>\n"
+            f"**Strategies:**\n"
             f"DCA: {stats.get('dca_trades', 0)} trades\n"
             f"Sniper: {stats.get('sniper_trades', 0)} trades\n"
             f"\n"
-            f"<b>Top performers:</b>\n"
+            f"**Top performers:**\n"
         )
 
         # Ajouter top 3 performers
@@ -283,11 +292,11 @@ class NotificationManager:
         emoji = mode_emoji.get(config.TRADING_MODE, '🤖')
 
         message = (
-            f"<b>{emoji} BOT STARTED</b>\n"
+            f"**{emoji} BOT STARTED**\n"
             f"Mode: {config.TRADING_MODE.upper()}\n"
             f"Capital: {config.CAPITAL_ALLOCATION['total']}€\n"
             f"\n"
-            f"<b>Active strategies:</b>\n"
+            f"**Active strategies:**\n"
             f"DCA: {'✅' if config.DCA_SETTINGS['enabled'] else '❌'}\n"
             f"Sniper: {'✅' if config.SNIPER_SETTINGS['enabled'] else '❌'}\n"
             f"Scanner: {'✅' if config.SCANNER_SETTINGS['enabled'] else '❌'}\n"
@@ -299,30 +308,27 @@ class NotificationManager:
 
     async def send_shutdown_message(self):
         """Envoie un message à l'arrêt du bot"""
-        message = "<b>🔴 BOT STOPPED</b>\nAll systems shutting down gracefully..."
+        message = "**🔴 BOT STOPPED**\nAll systems shutting down gracefully..."
         await self.send_warning(message)
 
     async def test_connection(self) -> bool:
         """
-        Teste la connexion Telegram
+        Teste la connexion Discord
 
         Returns:
             True si connexion OK, False sinon
         """
         if not self.enabled:
-            logger.warning("⚠️ Telegram non activé")
+            logger.warning("⚠️ Discord non activé")
             return False
 
         try:
-            await self.bot.send_message(
-                chat_id=self.chat_id,
-                text="✅ Test de connexion Telegram réussi!"
-            )
-            logger.info("✅ Test Telegram réussi")
+            await self.send_info("✅ Test de connexion Discord réussi!")
+            logger.info("✅ Test Discord réussi")
             return True
 
         except Exception as e:
-            logger.error(f"❌ Test Telegram échoué: {e}")
+            logger.error(f"❌ Test Discord échoué: {e}")
             return False
 
 

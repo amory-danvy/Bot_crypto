@@ -9,8 +9,8 @@ numpy==1.26.3
 # Technical analysis
 ta==0.11.0
 
-# Telegram notifications
-python-telegram-bot==20.7
+# Discord notifications
+aiohttp==3.9.1
 
 # Environment variables
 python-dotenv==1.0.0

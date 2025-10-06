@@ -20,9 +20,8 @@ BINANCE_API_SECRET = os.getenv('BINANCE_API_SECRET')
 BINANCE_TESTNET_API_KEY = os.getenv('BINANCE_TESTNET_API_KEY')
 BINANCE_TESTNET_API_SECRET = os.getenv('BINANCE_TESTNET_API_SECRET')
 
-# Telegram
-TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
-TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
+# Discord
+DISCORD_WEBHOOK_URL = os.getenv('DISCORD_WEBHOOK_URL')
 
 # === ALLOCATION DU CAPITAL ===
 CAPITAL_ALLOCATION = {
@@ -123,8 +122,8 @@ SCANNER_SETTINGS = {
 
 # === CONFIGURATION DES ALERTES ===
 ALERTS = {
-    # Activer/désactiver Telegram
-    'telegram_enabled': True,
+    # Activer/désactiver Discord
+    'discord_enabled': False,
 
     # Niveaux d'alertes
     'levels': {
@@ -241,10 +240,10 @@ def validate_config():
         if not BINANCE_API_KEY or not BINANCE_API_SECRET:
             errors.append("BINANCE_API_KEY et BINANCE_API_SECRET requis en mode live")
 
-    # Vérifier Telegram si activé
-    if ALERTS['telegram_enabled']:
-        if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
-            errors.append("TELEGRAM_BOT_TOKEN et TELEGRAM_CHAT_ID requis si telegram_enabled=True")
+    # Vérifier Discord si activé
+    if ALERTS['discord_enabled']:
+        if not DISCORD_WEBHOOK_URL or DISCORD_WEBHOOK_URL == 'your_discord_webhook_url_here':
+            errors.append("DISCORD_WEBHOOK_URL requis si discord_enabled=True")
 
     # Vérifier la répartition DCA
     total_allocation = sum(DCA_SETTINGS['coins'].values())
@@ -277,7 +276,7 @@ def display_config():
     print(f"   - Sniper: {'✅' if SNIPER_SETTINGS['enabled'] else '❌'}")
     print(f"   - Scanner: {'✅' if SCANNER_SETTINGS['enabled'] else '❌'}")
 
-    print(f"\n📱 Alertes Telegram: {'✅' if ALERTS['telegram_enabled'] else '❌'}")
+    print(f"\n📱 Alertes Discord: {'✅' if ALERTS['discord_enabled'] else '❌'}")
     print("="*60 + "\n")
 
 if __name__ == '__main__':
