@@ -119,7 +119,10 @@ class CryptoTradingBot:
             logger.info(f"\n🟢 Bot opérationnel avec {len(self.tasks)} tâches actives\n")
 
             # Attendre que toutes les tâches soient terminées
-            await asyncio.gather(*self.tasks, return_exceptions=True)
+            try:
+                await asyncio.gather(*self.tasks, return_exceptions=True)
+            except asyncio.CancelledError:
+                logger.info("⚠️ Tâches annulées")
 
         except Exception as e:
             logger.error(f"❌ Erreur dans le bot: {e}", exc_info=True)
@@ -190,9 +193,6 @@ class CryptoTradingBot:
             logger.info("\n🛑 ARRÊT DU BOT...")
             self.running = False
 
-            # Envoyer notification d'arrêt
-            await self.notif.send_shutdown_message()
-
             # Annuler toutes les tâches
             for task in self.tasks:
                 if not task.done():
@@ -200,6 +200,17 @@ class CryptoTradingBot:
 
             # Attendre que toutes les tâches se terminent
             await asyncio.gather(*self.tasks, return_exceptions=True)
+
+            # Envoyer notification d'arrêt
+            try:
+                await asyncio.wait_for(
+                    self.notif.send_shutdown_message(),
+                    timeout=3.0
+                )
+            except asyncio.TimeoutError:
+                logger.warning("⚠️ Timeout lors de l'envoi de la notification d'arrêt")
+            except Exception as e:
+                logger.warning(f"⚠️ Erreur lors de l'envoi de la notification d'arrêt: {e}")
 
             # Fermer les connexions
             if self.client:
@@ -212,8 +223,12 @@ class CryptoTradingBot:
 
     def signal_handler(self):
         """Gestionnaire de signaux pour arrêt propre"""
-        logger.info(f"\n⚠️ Signal reçu")
+        logger.info(f"\n⚠️ Signal reçu - Arrêt en cours...")
         self.running = False
+        # Annuler toutes les tâches
+        for task in self.tasks:
+            if not task.done():
+                task.cancel()
 
 
 # Instance globale du bot
@@ -241,20 +256,20 @@ async def main():
         # Démarrer le bot
         await bot.start()
 
-        # Arrêt propre
-        await bot.stop()
-
         return 0
 
     except KeyboardInterrupt:
         logger.info("\n⚠️ Interruption clavier détectée")
-        if bot:
-            await bot.stop()
         return 0
 
     except Exception as e:
         logger.error(f"❌ Erreur fatale: {e}", exc_info=True)
         return 1
+
+    finally:
+        # Arrêt propre dans tous les cas
+        if bot:
+            await bot.stop()
 
 
 def run():

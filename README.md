@@ -14,8 +14,8 @@ Bot de trading automatisé combinant plusieurs stratégies pour maximiser les op
   - Maximum 1 achat par jour
   - Support BTC (70%) et ETH (30%)
 
-- **Système de Notifications Telegram**
-  - Alertes en temps réel
+- **Système de Notifications Discord**
+  - Alertes en temps réel via Webhooks
   - Rapports quotidiens automatiques
   - Niveaux: INFO, OPPORTUNITY, TRADE, WARNING, ERROR
 
@@ -57,7 +57,7 @@ crypto_hybrid_bot/
 ### 1. Prérequis
 - Python 3.7 ou supérieur
 - Compte Binance (ou Binance Testnet pour tester)
-- Bot Telegram (optionnel mais recommandé)
+- Discord Webhook (optionnel mais recommandé)
 
 ### 2. Cloner et installer
 
@@ -96,9 +96,8 @@ BINANCE_API_SECRET=votre_secret_key
 BINANCE_TESTNET_API_KEY=votre_testnet_key
 BINANCE_TESTNET_API_SECRET=votre_testnet_secret
 
-# Telegram Bot
-TELEGRAM_BOT_TOKEN=votre_bot_token
-TELEGRAM_CHAT_ID=votre_chat_id
+# Discord Webhook
+DISCORD_WEBHOOK_URL=votre_discord_webhook_url
 ```
 
 #### C. Obtenir les credentials
@@ -115,12 +114,12 @@ TELEGRAM_CHAT_ID=votre_chat_id
 2. Créer un compte testnet
 3. Générer des API keys
 
-**Telegram Bot:**
-1. Parler à [@BotFather](https://t.me/botfather) sur Telegram
-2. Créer un nouveau bot avec `/newbot`
-3. Récupérer le token
-4. Démarrer une conversation avec votre bot
-5. Obtenir votre chat_id en visitant: `https://api.telegram.org/bot<YOUR_TOKEN>/getUpdates`
+**Discord Webhook:**
+1. Ouvrir Discord et aller sur le serveur de votre choix
+2. Paramètres du serveur → Intégrations → Webhooks
+3. Créer un nouveau webhook
+4. Copier l'URL du webhook
+5. Coller l'URL dans votre fichier `.env`
 
 ### 4. Ajuster la configuration
 
@@ -151,6 +150,8 @@ source venv/bin/activate
 
 # Lancer le bot
 python main.py
+
+# Pour arrêter le bot proprement: Ctrl+C
 ```
 
 ### Tester la configuration
@@ -205,9 +206,9 @@ Les logs sont dans `logs/bot.log` et dans la console:
 tail -f logs/bot.log
 ```
 
-### Notifications Telegram
+### Notifications Discord
 
-Si configuré, vous recevrez:
+Si configuré, vous recevrez sur Discord:
 - Alertes d'opportunités DCA
 - Confirmations de trades
 - Rapport quotidien à 20h
@@ -284,7 +285,7 @@ DCA_SETTINGS = {
 
 4. **Monitoring**
    - Vérifier régulièrement les logs
-   - Surveiller les notifications Telegram
+   - Surveiller les notifications Discord
    - Vérifier votre compte Binance
 
 ## 🐛 Dépannage
@@ -299,10 +300,10 @@ python config.py
 pip install -r requirements.txt --upgrade
 ```
 
-### Pas de notifications Telegram
+### Pas de notifications Discord
 
-1. Vérifier que `TELEGRAM_BOT_TOKEN` et `TELEGRAM_CHAT_ID` sont corrects
-2. Vérifier que vous avez démarré une conversation avec le bot
+1. Vérifier que `DISCORD_WEBHOOK_URL` est correct
+2. Vérifier que le webhook n'a pas été supprimé sur Discord
 3. Regarder les logs pour les erreurs
 
 ### Erreur API Binance
@@ -345,9 +346,10 @@ Le bot vérifie le RSI (Relative Strength Index) toutes les 4h:
 
 ### Version 1.0 ✅
 - [x] DCA Strategy
-- [x] Notifications Telegram
+- [x] Notifications Discord
 - [x] Multi-modes (dry_run, testnet, live)
 - [x] Logging complet
+- [x] Arrêt propre avec Ctrl+C
 
 ### Version 2.0 (À venir)
 - [ ] Sniper Strategy (nouvelles listings)
