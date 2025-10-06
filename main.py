@@ -210,10 +210,10 @@ class CryptoTradingBot:
         except Exception as e:
             logger.error(f"❌ Erreur lors de l'arrêt: {e}")
 
-    def signal_handler(self, sig, frame):
+    def signal_handler(self):
         """Gestionnaire de signaux pour arrêt propre"""
-        logger.info(f"\n⚠️ Signal reçu: {sig}")
-        asyncio.create_task(self.stop())
+        logger.info(f"\n⚠️ Signal reçu")
+        self.running = False
 
 
 # Instance globale du bot
@@ -229,8 +229,9 @@ async def main():
         bot = CryptoTradingBot()
 
         # Installer les gestionnaires de signaux
-        signal.signal(signal.SIGINT, lambda s, f: asyncio.create_task(bot.stop()))
-        signal.signal(signal.SIGTERM, lambda s, f: asyncio.create_task(bot.stop()))
+        loop = asyncio.get_running_loop()
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            loop.add_signal_handler(sig, bot.signal_handler)
 
         # Initialiser
         if not await bot.initialize():
@@ -239,6 +240,9 @@ async def main():
 
         # Démarrer le bot
         await bot.start()
+
+        # Arrêt propre
+        await bot.stop()
 
         return 0
 

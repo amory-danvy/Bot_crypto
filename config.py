@@ -123,7 +123,7 @@ SCANNER_SETTINGS = {
 # === CONFIGURATION DES ALERTES ===
 ALERTS = {
     # Activer/désactiver Discord
-    'discord_enabled': False,
+    'discord_enabled': True,
 
     # Niveaux d'alertes
     'levels': {
